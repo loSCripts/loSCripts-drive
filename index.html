@@ -31,7 +31,11 @@
         function authenticate() {
             gapi.auth2.getAuthInstance().signIn().then(function() {
                 console.log("Utilisateur connecté");
+                document.getElementById('signin-button').style.display = 'none';
+                document.getElementById('signout-button').style.display = 'block';
                 loadClient();
+            }).catch(function(error) {
+                console.log('Erreur lors de l\'authentification : ', error);
             });
         }
         
@@ -70,6 +74,8 @@
                 } else {
                     console.log('Aucun fichier trouvé.');
                 }
+            }).catch(function(error) {
+                console.log('Erreur lors de la récupération des fichiers : ', error);
             });
         }
 
@@ -87,6 +93,8 @@
                         document.getElementById('signin-button').style.display = 'block';
                         document.getElementById('signout-button').style.display = 'none';
                     }
+                }).catch(function(error) {
+                    console.log('Erreur lors de l\'initialisation de l\'API : ', error);
                 });
             });
         }

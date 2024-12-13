@@ -49,6 +49,8 @@
       }).then(function() {
         gapiInited = true;
         checkAuth();
+      }).catch(function(error) {
+        console.error('Erreur lors de l\'initialisation de l\'API Google:', error);
       });
     }
 
@@ -71,6 +73,10 @@
 
     // Fonction de connexion
     function handleAuthClick() {
+      if (!gapiInited) {
+        alert("API Google non initialisée !");
+        return;
+      }
       gapi.auth2.getAuthInstance().signIn().then(function() {
         console.log('Utilisateur connecté');
       }).catch(function(error) {
@@ -80,6 +86,10 @@
 
     // Fonction de déconnexion
     function handleSignoutClick() {
+      if (!gapiInited) {
+        alert("API Google non initialisée !");
+        return;
+      }
       gapi.auth2.getAuthInstance().signOut().then(function() {
         console.log('Utilisateur déconnecté');
       }).catch(function(error) {
@@ -140,6 +150,8 @@
         }).then(function() {
           gapi.auth2.getAuthInstance().isSignedIn.listen(updateSigninStatus);
           updateSigninStatus(gapi.auth2.getAuthInstance().isSignedIn.get());
+        }).catch(function(error) {
+          console.error('Erreur lors de l\'initialisation de l\'API Google:', error);
         });
       });
     }

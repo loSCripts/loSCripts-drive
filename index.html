@@ -3,24 +3,167 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Redirection vers Google</title>
-    <meta http-equiv="refresh" content="2; url=https://accounts.google.com/signup">
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            padding: 50px;
-        }
-        .message {
-            font-size: 18px;
-        }
-    </style>
+    <title>Gestion des fichiers Cloud sécurisés</title>
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://www.dropbox.com/static/api/2/dropins.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.1.1/core.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.1.1/aes.js"></script>
 </head>
 <body>
-    <div>
-        <h1>Bienvenue !</h1>
-        <p class="message">Vous allez être redirigé vers la page de création de compte Google...</p>
-        <p>Si la redirection ne se fait pas automatiquement, <a href="https://accounts.google.com/signup">cliquez ici</a>.</p>
-    </div>
+    <h1>Stockage sécurisé sur plusieurs services Cloud</h1>
+    <p>Connectez-vous à vos services de stockage pour stocker vos fichiers de manière sécurisée.</p>
+
+    <!-- Connexion aux services -->
+    <button id="google-login">Se connecter à Google Drive</button>
+    <button id="dropbox-login">Se connecter à Dropbox</button>
+    <button id="onedrive-login">Se connecter à OneDrive</button>
+
+    <h2>Gérer vos fichiers</h2>
+    <p>Choisissez un fichier à télécharger. Il sera automatiquement réparti entre vos services de stockage disponibles.</p>
+    <input type="file" id="file-upload" style="display:none;">
+    <button id="upload-btn" style="display:none;">Télécharger un fichier</button>
+
+    <h2>Fichiers téléchargés</h2>
+    <ul id="file-list"></ul>
+
+    <script>
+        // Variables pour les API
+        const CLIENT_ID_GOOGLE = 'YOUR_GOOGLE_CLIENT_ID'; // Remplace par ton ID client Google
+        const API_KEY_GOOGLE = 'YOUR_GOOGLE_API_KEY';    // Remplace par ta clé API Google
+        const SCOPES_GOOGLE = 'https://www.googleapis.com/auth/drive.file';
+        const DROPBOX_APP_KEY = 'YOUR_DROPBOX_APP_KEY';  // Remplace par ta clé Dropbox
+        const CLIENT_ID_ONEDRIVE = 'YOUR_ONEDRIVE_CLIENT_ID'; // Remplace par ton ID client OneDrive
+
+        let googleAuthInstance = null;
+        let dropboxAuthInstance = null;
+        let onedriveAuthInstance = null;
+        let selectedFile = null;
+
+        // Cryptage AES du fichier avant l'envoi
+        function encryptFile(file) {
+            const reader = new FileReader();
+            reader.onload = function() {
+                const fileData = reader.result;
+                const encryptedData = CryptoJS.AES.encrypt(fileData, 'secret-key').toString();
+                sendToStorage(encryptedData, file);
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Envoi du fichier crypté vers les services de stockage
+        function sendToStorage(encryptedData, file) {
+            const fileName = file.name;
+            // Logique pour vérifier l'espace de stockage sur chaque service et répartir les fichiers
+            console.log("Envoi du fichier crypté", fileName);
+
+            // Exemple pour Google Drive
+            if (googleAuthInstance.isSignedIn.get()) {
+                uploadToGoogleDrive(encryptedData, fileName);
+            } else if (dropboxAuthInstance) {
+                uploadToDropbox(encryptedData, fileName);
+            } else if (onedriveAuthInstance) {
+                uploadToOneDrive(encryptedData, fileName);
+            }
+        }
+
+        // Fonction de téléchargement sur Google Drive
+        function uploadToGoogleDrive(encryptedData, fileName) {
+            const request = gapi.client.drive.files.create({
+                media: {
+                    mimeType: 'application/octet-stream',
+                    body: encryptedData
+                },
+                resource: {
+                    name: fileName
+                }
+            });
+            request.execute(function(response) {
+                console.log('Fichier téléchargé sur Google Drive', response);
+                addFileToList(fileName, 'Google Drive');
+            });
+        }
+
+        // Fonction de téléchargement sur Dropbox
+        function uploadToDropbox(encryptedData, fileName) {
+            Dropbox.choose({
+                success: function(files) {
+                    console.log('Fichier téléchargé sur Dropbox', files);
+                    addFileToList(fileName, 'Dropbox');
+                }
+            });
+        }
+
+        // Fonction de téléchargement sur OneDrive
+        function uploadToOneDrive(encryptedData, fileName) {
+            console.log('Fichier téléchargé sur OneDrive');
+            addFileToList(fileName, 'OneDrive');
+        }
+
+        // Ajouter un fichier à la liste des fichiers téléchargés
+        function addFileToList(fileName, service) {
+            const listItem = document.createElement('li');
+            listItem.textContent = `${fileName} - Stocké sur ${service}`;
+            document.getElementById('file-list').appendChild(listItem);
+        }
+
+        // Google Drive Authentication
+        function googleAuth() {
+            gapi.auth2.getAuthInstance().signIn().then(function() {
+                console.log('Google Drive connecté');
+                document.getElementById('upload-btn').style.display = 'inline-block';
+            });
+        }
+
+        function initGoogleClient() {
+            gapi.client.init({
+                apiKey: API_KEY_GOOGLE,
+                clientId: CLIENT_ID_GOOGLE,
+                scope: SCOPES_GOOGLE
+            }).then(function() {
+                googleAuthInstance = gapi.auth2.getAuthInstance();
+                document.getElementById('google-login').addEventListener('click', googleAuth);
+            });
+        }
+
+        // Dropbox Authentication
+        function dropboxAuth() {
+            Dropbox.init({appKey: DROPBOX_APP_KEY});
+            Dropbox.choose({
+                success: function(files) {
+                    console.log('Dropbox connecté');
+                    document.getElementById('upload-btn').style.display = 'inline-block';
+                },
+                cancel: function() {
+                    console.log('Annulation Dropbox');
+                }
+            });
+        }
+
+        // OneDrive Authentication
+        function onedriveAuth() {
+            // Paramétrage pour OneDrive
+            const authUrl = `https://login.live.com/oauth20_authorize.srf?client_id=${CLIENT_ID_ONEDRIVE}&scope=files.readwrite&response_type=token&redirect_uri=http://localhost:8000/`;
+            window.location.href = authUrl;
+        }
+
+        // Gestion du téléchargement de fichiers
+        document.getElementById('upload-btn').addEventListener('click', function() {
+            const fileInput = document.getElementById('file-upload');
+            fileInput.click();
+            fileInput.addEventListener('change', function() {
+                selectedFile = fileInput.files[0];
+                if (selectedFile) {
+                    encryptFile(selectedFile);
+                }
+            });
+        });
+
+        // Initialisation des API
+        gapi.load('client:auth2', initGoogleClient);
+
+        // Lier les boutons aux fonctions
+        document.getElementById('dropbox-login').addEventListener('click', dropboxAuth);
+        document.getElementById('onedrive-login').addEventListener('click', onedriveAuth);
+    </script>
 </body>
 </html>
